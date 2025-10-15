@@ -1,7 +1,17 @@
-FROM jupyter/pyspark-notebook:latest
+FROM python:3.11-slim
 
-WORKDIR /home/jovyan/work
+# Instalar Java (necessário para Spark)
+RUN apt-get update && apt-get install -y openjdk-11-jdk && rm -rf /var/lib/apt/lists/*
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 
+# Instalar PySpark
+RUN pip install pyspark
+
+# Configurar diretório de trabalho
+WORKDIR /app
+
+# Copiar script
 COPY script_pyspark.py .
 
-EXPOSE 8888
+# Comando padrão
+CMD ["python", "script_pyspark.py"]
