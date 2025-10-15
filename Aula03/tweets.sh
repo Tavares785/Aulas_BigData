@@ -1,1 +1,0 @@
-docker exec -it bigdata-kafka-1 kafka-topics.sh --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 3 --topic tweets
