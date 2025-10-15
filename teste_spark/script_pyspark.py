@@ -1,8 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, avg, round
 
-# 1. Inicializa a SparkSession (o ponto de entrada para a funcionalidade Spark)
-# Usamos 'local[*]' para rodar em modo local, usando todos os cores disponíveis.
+# 1. Inicializa a SparkSession
 spark = SparkSession.builder \
     .appName("ExemploPySparkSimples") \
     .getOrCreate()
@@ -31,18 +30,18 @@ df.printSchema()
 
 # 4. Transformação (Filtrar e Adicionar Coluna)
 # Filtra funcionários com salário > 3500 e cria uma coluna de 'Bônus' (10% do salário)
-df_filtrado = df.filter(col("Valor") > 3500) \
-                .withColumn("Bonus", round(col("Valor") * 0.10, 2))
+df_filtrado = df.filter(col("Salario") > 3500) \
+                .withColumn("Bonus", round(col("Salario") * 0.10, 2))
 
 print("\n--- 2. DataFrame Filtrado (Salário > 3500) com Coluna 'Bonus' ---")
 df_filtrado.show()
 
 # 5. Agregação (Calcular Salário Médio por Departamento)
 df_agregado = df.groupBy("Departamento") \
-               .agg(
-                   round(avg("Salario"), 2).alias("Salario_Medio")
-               ) \
-               .orderBy(col("Salario_Medio").desc())
+                .agg(
+                    round(avg("Salario"), 2).alias("Salario_Medio")
+                ) \
+                .orderBy(col("Salario_Medio").desc())
 
 print("\n--- 3. Salário Médio por Departamento ---")
 df_agregado.show()
