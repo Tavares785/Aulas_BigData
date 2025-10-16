@@ -5,8 +5,6 @@ from pyspark.sql.functions import col, avg, round
 # Usamos 'local[*]' para rodar em modo local, usando todos os cores disponíveis.
 spark = SparkSession.builder \
     .appName("ExemploPySparkSimples") \
-    .master("local[*]") \
-    .config("spark.driver.memory", "2g") \
     .getOrCreate()
 
 print("==============================================")
@@ -50,11 +48,6 @@ print("\n--- 3. Salário Médio por Departamento ---")
 df_agregado.show()
 
 # 6. Finaliza a SparkSession
-spark.stop()
-
-print("\n==============================================")
-print("SparkSession finalizada com sucesso!")
-print("==============================================")
 spark.stop()
 print("==============================================")
 print("Processamento PySpark concluído e SparkSession encerrada.")

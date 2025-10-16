@@ -1,19 +1,7 @@
-FROM python:3.9-bullseye
+FROM jupyter/pyspark-notebook:latest
 
-# Instalar Java
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    openjdk-17-jre-headless \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /home/jovyan/work
 
-# Instalar PySpark
-RUN pip install --no-cache-dir pyspark==3.4.1
-
-# Configurar variáveis de ambiente
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV SPARK_HOME=/usr/local/lib/python3.9/site-packages/pyspark
-
-WORKDIR /app
 COPY script_pyspark.py .
 
-CMD ["python", "script_pyspark.py"]
+EXPOSE 8888
