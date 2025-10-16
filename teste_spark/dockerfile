@@ -4,4 +4,6 @@ WORKDIR /home/jovyan/work
 
 COPY script_pyspark.py .
 
+CMD ["python", "script_pyspark.py"]
+
 EXPOSE 8888
