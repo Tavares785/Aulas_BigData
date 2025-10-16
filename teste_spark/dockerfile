@@ -1,7 +1,13 @@
-FROM jupyter/pyspark-notebook:latest
+FROM apache/spark-py:latest
 
-WORKDIR /home/jovyan/work
+# Muda para root e instala Jupyter Lab
+USER root
+RUN pip install --no-cache-dir jupyterlab
+
+WORKDIR /opt/spark/work-dir
 
 COPY script_pyspark.py .
+
+CMD ["/opt/spark/bin/spark-submit", "script_pyspark.py"]
 
 EXPOSE 8888
