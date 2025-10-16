@@ -1,6 +1,6 @@
 FROM jupyter/pyspark-notebook:latest
 
-WORKDIR /home/jovyan/work
+WORKDIR /home/projetos/work
 
 COPY script_pyspark.py .
 
