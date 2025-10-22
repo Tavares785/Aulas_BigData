@@ -1,9 +1,9 @@
 version: "3.8"
 
 services:
-  # ==============
-  # Banco para Metastore (Postgres)
-  # ==============
+  # ==============================
+  # Postgres (Hive Metastore)
+  # ==============================
   postgres:
     image: postgres:13
     container_name: postgres-metastore
@@ -16,75 +16,84 @@ services:
     networks:
       - data-network
 
-  # ==============
-  # HDFS (NameNode)
-  # ==============
+  # ==============================
+  # HDFS NameNode
+  # ==============================
   namenode:
-    image: bde2020/hadoop-namenode:latest
-    container_name: hadoop-namenode
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
     environment:
-      - CLUSTER_NAME=test
+      - CLUSTER_NAME=hadoop-cluster
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      - HDFS_CONF_dfs_replication=1
+    ports:
+      - "9870:9870"   # Web UI
+      - "9000:9000"   # RPC
     volumes:
       - hdfs-namenode:/hadoop/dfs/name
-    ports:
-      - "9870:9870"
     networks:
       - data-network
-    depends_on:
-      - datanode
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9870"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
-  # ==============
-  # HDFS (DataNode)
-  # ==============
+  # ==============================
+  # HDFS DataNode
+  # ==============================
   datanode:
-    image: bde2020/hadoop-datanode:latest
-    container_name: hadoop-datanode
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
     environment:
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      - HDFS_CONF_dfs_replication=1
     volumes:
       - hdfs-datanode:/hadoop/dfs/data
+    depends_on:
+      namenode:
+        condition: service_healthy
     networks:
       - data-network
-    depends_on:
-      - namenode
 
-  # ==============
+  # ==============================
   # Spark Master
-  # ==============
+  # ==============================
   spark-master:
-    image: bde2020/spark-master:latest
+    image: bde2020/spark-master:3.1.1-hadoop3.2
     container_name: spark-master
     environment:
       - ENABLE_INIT_DAEMON=false
       - SPARK_MODE=master
     ports:
-      - "7077:7077"
-      - "8080:8080"
+      - "7077:7077"   # Spark master service
+      - "8080:8080"   # Spark master UI
     networks:
       - data-network
     depends_on:
-      - namenode
+      namenode:
+        condition: service_healthy
 
-  # ==============
+  # ==============================
   # Spark Worker
-  # ==============
+  # ==============================
   spark-worker:
-    image: bde2020/spark-worker:latest
+    image: bde2020/spark-worker:3.1.1-hadoop3.2
     container_name: spark-worker
     environment:
       - ENABLE_INIT_DAEMON=false
       - SPARK_MASTER=spark://spark-master:7077
       - SPARK_MODE=worker
     ports:
-      - "8081:8081"
+      - "8081:8081"   # Spark worker UI
     networks:
       - data-network
     depends_on:
       - spark-master
 
-  # ==============
-  # Hive (Metastore + HiveServer2)
-  # ==============
+  # ==============================
+  # Hive (Metastore + Server2)
+  # ==============================
   hive:
     image: bde2020/hive:latest
     container_name: hive
@@ -94,9 +103,10 @@ services:
       - HIVE_METASTORE_HOST=postgres
       - HIVE_METASTORE_DB=metastore
       - HIVE_WAREHOUSE_DIR=/user/hive/warehouse
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
     ports:
-      - "10000:10000"
-      - "9083:9083"
+      - "10000:10000" # HiveServer2
+      - "9083:9083"   # Metastore
     volumes:
       - hive-warehouse:/user/hive/warehouse
     networks:
@@ -105,9 +115,9 @@ services:
       - postgres
       - namenode
 
-  # ==============
-  # JupyterLab para desenvolvimento
-  # ==============
+  # ==============================
+  # JupyterLab (com PySpark)
+  # ==============================
   jupyterlab:
     image: jupyter/pyspark-notebook:latest
     container_name: jupyterlab
@@ -124,6 +134,9 @@ services:
       - spark-master
       - hive
 
+# ==============================
+# Networks e Volumes
+# ==============================
 networks:
   data-network:
     driver: bridge
