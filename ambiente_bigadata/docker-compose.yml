@@ -1,0 +1,135 @@
+version: "3.8"
+
+services:
+  # ==============
+  # Banco para Metastore (Postgres)
+  # ==============
+  postgres:
+    image: postgres:13
+    container_name: postgres-metastore
+    environment:
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hivepass
+      POSTGRES_DB: metastore
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - data-network
+
+  # ==============
+  # HDFS (NameNode)
+  # ==============
+  namenode:
+    image: bde2020/hadoop-namenode:latest
+    container_name: hadoop-namenode
+    environment:
+      - CLUSTER_NAME=test
+    volumes:
+      - hdfs-namenode:/hadoop/dfs/name
+    ports:
+      - "9870:9870"
+    networks:
+      - data-network
+    depends_on:
+      - datanode
+
+  # ==============
+  # HDFS (DataNode)
+  # ==============
+  datanode:
+    image: bde2020/hadoop-datanode:latest
+    container_name: hadoop-datanode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - hdfs-datanode:/hadoop/dfs/data
+    networks:
+      - data-network
+    depends_on:
+      - namenode
+
+  # ==============
+  # Spark Master
+  # ==============
+  spark-master:
+    image: bde2020/spark-master:latest
+    container_name: spark-master
+    environment:
+      - ENABLE_INIT_DAEMON=false
+      - SPARK_MODE=master
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    networks:
+      - data-network
+    depends_on:
+      - namenode
+
+  # ==============
+  # Spark Worker
+  # ==============
+  spark-worker:
+    image: bde2020/spark-worker:latest
+    container_name: spark-worker
+    environment:
+      - ENABLE_INIT_DAEMON=false
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_MODE=worker
+    ports:
+      - "8081:8081"
+    networks:
+      - data-network
+    depends_on:
+      - spark-master
+
+  # ==============
+  # Hive (Metastore + HiveServer2)
+  # ==============
+  hive:
+    image: bde2020/hive:latest
+    container_name: hive
+    environment:
+      - HIVE_METASTORE_USER=hive
+      - HIVE_METASTORE_PASSWORD=hivepass
+      - HIVE_METASTORE_HOST=postgres
+      - HIVE_METASTORE_DB=metastore
+      - HIVE_WAREHOUSE_DIR=/user/hive/warehouse
+    ports:
+      - "10000:10000"
+      - "9083:9083"
+    volumes:
+      - hive-warehouse:/user/hive/warehouse
+    networks:
+      - data-network
+    depends_on:
+      - postgres
+      - namenode
+
+  # ==============
+  # JupyterLab para desenvolvimento
+  # ==============
+  jupyterlab:
+    image: jupyter/pyspark-notebook:latest
+    container_name: jupyterlab
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - HIVE_SERVER2=jdbc:hive2://hive:10000
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/tavares/work
+    networks:
+      - data-network
+    depends_on:
+      - spark-master
+      - hive
+
+networks:
+  data-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  hdfs-namenode:
+  hdfs-datanode:
+  hive-warehouse:
