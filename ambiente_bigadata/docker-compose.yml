@@ -1,34 +1,23 @@
-version: "3.8"
-
+x-spark-base: &spark-base
+  image: bde2020/spark-master:3.3.0-hadoop3.3
+  environment:
+    - SPARK_RPC_AUTHENTICATION_ENABLED=no
+    - SPARK_RPC_ENCRYPTION_ENABLED=no
+    - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+  networks:
+    - data-network
+  depends_on:
+    namenode: { condition: service_healthy }
 services:
-  # ==============================
-  # Postgres (Hive Metastore)
-  # ==============================
-  postgres:
-    image: postgres:13
-    container_name: postgres-metastore
-    environment:
-      POSTGRES_USER: hive
-      POSTGRES_PASSWORD: hivepass
-      POSTGRES_DB: metastore
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    networks:
-      - data-network
-
-  # ==============================
-  # HDFS NameNode
-  # ==============================
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
     environment:
       - CLUSTER_NAME=hadoop-cluster
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
-      - HDFS_CONF_dfs_replication=1
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
     ports:
-      - "9870:9870"   # Web UI
-      - "9000:9000"   # RPC
+      - "9870:9870"
+      - "9000:9000"
     volumes:
       - hdfs-namenode:/hadoop/dfs/name
     networks:
@@ -38,16 +27,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-
-  # ==============================
-  # HDFS DataNode
-  # ==============================
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     container_name: datanode
     environment:
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
-      - HDFS_CONF_dfs_replication=1
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
     volumes:
       - hdfs-datanode:/hadoop/dfs/data
     depends_on:
@@ -55,94 +39,40 @@ services:
         condition: service_healthy
     networks:
       - data-network
-
-  # ==============================
-  # Spark Master
-  # ==============================
   spark-master:
-    image: bde2020/spark-master:3.1.1-hadoop3.2
+    <<: *spark-base
     container_name: spark-master
     environment:
-      - ENABLE_INIT_DAEMON=false
       - SPARK_MODE=master
     ports:
-      - "7077:7077"   # Spark master service
-      - "8080:8080"   # Spark master UI
-    networks:
-      - data-network
-    depends_on:
-      namenode:
-        condition: service_healthy
-
-  # ==============================
-  # Spark Worker
-  # ==============================
+      - "8080:8080"
+      - "7077:7077"
   spark-worker:
-    image: bde2020/spark-worker:3.1.1-hadoop3.2
+    <<: *spark-base
     container_name: spark-worker
     environment:
-      - ENABLE_INIT_DAEMON=false
-      - SPARK_MASTER=spark://spark-master:7077
       - SPARK_MODE=worker
-    ports:
-      - "8081:8081"   # Spark worker UI
-    networks:
-      - data-network
+      - SPARK_MASTER_URL=spark://spark-master:7077
     depends_on:
       - spark-master
-
-  # ==============================
-  # Hive (Metastore + Server2)
-  # ==============================
-  hive:
-    image: bde2020/hive:latest
-    container_name: hive
-    environment:
-      - HIVE_METASTORE_USER=hive
-      - HIVE_METASTORE_PASSWORD=hivepass
-      - HIVE_METASTORE_HOST=postgres
-      - HIVE_METASTORE_DB=metastore
-      - HIVE_WAREHOUSE_DIR=/user/hive/warehouse
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
-    ports:
-      - "10000:10000" # HiveServer2
-      - "9083:9083"   # Metastore
-    volumes:
-      - hive-warehouse:/user/hive/warehouse
-    networks:
-      - data-network
-    depends_on:
-      - postgres
-      - namenode
-
-  # ==============================
-  # JupyterLab (com PySpark)
-  # ==============================
-  jupyterlab:
-    image: jupyter/pyspark-notebook:latest
-    container_name: jupyterlab
-    environment:
-      - SPARK_MASTER=spark://spark-master:7077
-      - HIVE_SERVER2=jdbc:hive2://hive:10000
+  jupyter-lab:
+    user: "1000:1000"
+    build:
+      context: .
+      dockerfile: dockerfile.jupyter
+    container_name: jupyter-lab
     ports:
       - "8888:8888"
+    environment:
+      - PYSPARK_PYTHON=python3
+      - SPARK_HOME=/usr/local/spark
     volumes:
-      - ./notebooks:/home/tavares/work
+      - ./notebooks:/home/tavares
     networks:
       - data-network
-    depends_on:
-      - spark-master
-      - hive
-
-# ==============================
-# Networks e Volumes
-# ==============================
+volumes:
+  hdfs-namenode:
+  hdfs-datanode:
 networks:
   data-network:
     driver: bridge
-
-volumes:
-  pgdata:
-  hdfs-namenode:
-  hdfs-datanode:
-  hive-warehouse:

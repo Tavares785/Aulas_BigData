@@ -72,7 +72,7 @@ docker compose down -v
 
 ### Acessar o Hive via Beeline
 ```bash
-docker exec -it hive /opt/hive/bin/beeline -u jdbc:hive2://localhost:10000 -n hive
+docker exec -it hive /opt/hive/bin/beeline -u jdbc:hive2://localhost:10000 -n hive -p hivepass
 ```
 
 ### Exemplo de comando HiveQL
@@ -98,33 +98,13 @@ docker exec -it spark-master /bin/bash
 spark-shell --master spark://spark-master:7077
 ```
 
-### Teste rápido no shell Scala
-```scala
-val data = spark.range(10)
-data.show()
+### Depois que o cluster estiver de pé, executa:
+```bash
+docker exec -it namenode bash
+hdfs dfs -mkdir -p /user/spark
+hdfs dfs -chown -R jovyan:supergroup /user/spark
+hdfs dfs -chmod -R 777 /user/spark
 ```
-
-
-## 🗂️ Resumo do docker-compose.yml
-
-|------------------|-------------------------|-------------------------------|
-| Serviço          |      Imagem base        |            Função             |
-|------------------|-------------------------|-------------------------------|
-| **postgres**     | postgres:13             | Armazena o metastore do Hive  |
-| **namenode**     | bde2020/hadoop-namenode | Gerencia metadados do HDFS    |
-| **datanode**     | bde2020/hadoop-datanode | Armazena blocos de dados      |
-| **spark-master** | bde2020/spark-master    | Coordena o cluster Spark      |
-| **spark-worker** | bde2020/spark-worker    | Executa tarefas distribuídas  |
-| **hive**         | bde2020/hive            | Data Warehouse SQL sobre HDFS |
-|------------------|-------------------------|-------------------------------|
-
-
-## 📚 Referências
-
-- [Apache Spark Documentation](https://spark.apache.org/docs/latest/)
-- [Apache Hive Documentation](https://cwiki.apache.org/confluence/display/Hive/)
-- [Big Data Europe Docker Images](https://github.com/big-data-europe)
-- [Hadoop HDFS Overview](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)
 
 ## Dicas
 Dentro de um notebook Python (PySpark):
@@ -132,13 +112,34 @@ Dentro de um notebook Python (PySpark):
 ```python
 from pyspark.sql import SparkSession
 
+print("Tentando criar a sessão Spark e conectar ao HDFS...")
+# Conecta ao Spark Master e configura o acesso ao HDFS
 spark = SparkSession.builder \
-    .appName("JupyterSparkHive") \
-    .master("spark://spark-master:7077") \
-    .config("spark.sql.catalogImplementation", "hive") \
-    .config("hive.metastore.uris", "thrift://hive:9083") \
-    .enableHiveSupport() \
+    .appName("SparkHDFS") \
     .getOrCreate()
 
-spark.sql("SHOW DATABASES").show()
+print("Sessão Spark criada com sucesso!")
+
+# --- Teste de Leitura/Escrita no HDFS ---
+
+# Cria um pequeno DataFrame
+data = [("Alice", 10), ("Bob", 20), ("Charlie", 30)]
+columns = ["name", "value"]
+df = spark.createDataFrame(data, columns)
+
+# Define o caminho no HDFS
+hdfs_path = "hdfs://namenode:9000/user/spark/data/final_test"
+
+# Escreve o DataFrame no HDFS
+# O Spark cria o caminho e o arquivo Parquet
+df.write.mode("overwrite").parquet(hdfs_path)
+print(f"Dados escritos no HDFS em: {hdfs_path}")
+
+# Lê os dados de volta para verificar
+df_read = spark.read.parquet(hdfs_path)
+print("\nDados lidos do HDFS:")
+df_read.show()
+
+spark.stop()
+print("Teste concluído. O ambiente Spark/HDFS está funcionando!")
 ```

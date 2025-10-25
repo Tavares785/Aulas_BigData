@@ -1,0 +1,6 @@
+FROM jupyter/pyspark-notebook:latest
+
+USER root
+RUN useradd -m -u 1000 tavares
+USER tavares
+WORKDIR /home/tavares
