@@ -1,13 +1,12 @@
-# 🚀 Ambiente Big Data com Spark, Hive e HDFS
+# 🚀 Ambiente Big Data
 
 Este ambiente Docker Compose levanta um **mini cluster de Big Data** com os seguintes componentes:
 
 - **HDFS (Hadoop Distributed File System)**: Armazenamento distribuído de dados.
 - **Spark**: Motor de processamento distribuído (modo standalone).
   - Spark Master + 1 Worker.
-- **Hive**: Data Warehouse SQL sobre o HDFS.
-  - Inclui Hive Metastore e HiveServer2.
 - **PostgreSQL**: Banco de dados do metastore do Hive.
+- **Superset**: Plataforma de visualização de dados.
 
 O ambiente é modular — você pode adicionar outros serviços facilmente (Kafka, Airflow, Zeppelin, etc.).
 
@@ -51,6 +50,7 @@ docker compose down
 ### Para limpar volumes e dados persistidos:
 ```bash
 docker compose down -v
+docker-compose down --rmi all 
 ```
 
 ---
@@ -62,28 +62,20 @@ docker compose down -v
 | Spark Master UI | 8080 | Interface Web do Spark Master |
 | Spark Worker UI | 8081 | Interface Web do Spark Worker |
 | Hadoop NameNode UI | 9870 | Monitoramento do HDFS |
-| HiveServer2 (Thrift) | 10000 | Conexão JDBC/Beeline |
-| Hive Metastore Thrift | 9083 | Comunicação interna do Hive |
 | PostgreSQL | 5432 | Banco de dados do metastore |
 
 ---
-
-## 🧠 Testando o Hive
-
-### Acessar o Hive via Beeline
+### Criação do usuário admin do Superset
 ```bash
-docker exec -it hive /opt/hive/bin/beeline -u jdbc:hive2://localhost:10000 -n hive -p hivepass
+docker exec -it superset superset db upgrade
+docker exec -it superset superset init
+docker exec -it superset superset fab create-admin --username admin --password admin --firstname Superset --lastname Admin --email admin@superset.com
+docker-compose restart superset
 ```
-
-### Exemplo de comando HiveQL
-```sql
-CREATE DATABASE teste;
-USE teste;
-CREATE TABLE exemplo (id INT, nome STRING);
-INSERT INTO exemplo VALUES (1, 'SparkHive');
-SELECT * FROM exemplo;
+String de conexão no Superset:
 ```
-
+hive://spark-thrift:10000/default
+docker exec -it --user root superset bash
 ---
 
 ## ⚡ Testando o Spark
